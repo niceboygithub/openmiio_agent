@@ -6,6 +6,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"io"
 	"os"
+	"os/exec"
 	"runtime"
 	"strings"
 )
@@ -39,8 +40,12 @@ func Init() {
 
 	// get device model and firmware version
 	if b, err := os.ReadFile("/etc/build.prop"); err == nil {
-		Firmware = getKey(b, "ro.sys.mi_fw_ver=") + "_" + getKey(b, "ro.sys.mi_build_num=")
 		Model = getKey(b, "ro.sys.model=")
+		if IsAiot() {
+			Firmware = getKey(b, "ro.sys.fw_ver=") + "_" + getKey(b, "ro.sys.build_num=")
+		} else {
+			Firmware = getKey(b, "ro.sys.mi_fw_ver=") + "_" + getKey(b, "ro.sys.mi_build_num=")
+		}
 	} else if b, err = os.ReadFile("/etc/rootfs_fw_info"); err == nil {
 		Firmware = getKey(b, "version=")
 		Model = ModelMGW
@@ -79,9 +84,17 @@ const (
 	ModelMGW   = "lumi.gateway.mgl03"
 	ModelE1    = "lumi.gateway.aqcn02"
 	ModelMGW2  = "lumi.gateway.mcn001"
+	ModelM1S   = "lumi.gateway.acn01"
 	ModelM1S22 = "lumi.gateway.acn004"
+	ModelM2    = "lumi.gateway.iragl5"
+	ModelG2H   = "lumi.camera.gwagl02"
+	ModelG2HPro= "lumi.camera.agl001"
+	ModelG3    = "lumi.camera.gwpagl01"
+	ModelM2PoE = "lumi.gateway.iragl8"
+	ModelM3    = "lumi.gateway.acn012"
 )
 
+var Cloud string
 var Firmware string
 var Model string
 var Args = map[string]string{}
@@ -97,3 +110,33 @@ func getKey(b []byte, sub string) string {
 	}
 	return string(b)
 }
+
+func IsAiot() bool {
+	switch Model {
+	case ModelM2, ModelM1S, ModelG2H, ModelM1S22, ModelG2HPro, ModelM2PoE, ModelG3, ModelM3:
+		if Model == ModelM1S || Model == ModelM1S22 {
+			if Cloud == "" {
+				if b, err := exec.Command("agetprop", "persist.sys.cloud").Output(); err == nil {
+					Cloud = strings.TrimRight(string(b), "\n")
+				}
+			}
+			if  Cloud == "miot" {
+				return false
+			}
+		}
+		Cloud = "aiot"
+		return true
+	case ModelE1:
+		if Cloud == "" {
+			if b, err := exec.Command("agetprop", "persist.sys.cloud").Output(); err == nil {
+				Cloud = strings.TrimRight(string(b), "\n")
+			}
+		}
+		if  Cloud == "aiot" {
+			return true
+		}
+	}
+	Cloud = "miot"
+	return false
+}
+

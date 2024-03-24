@@ -50,6 +50,11 @@ var log zerolog.Logger
 
 func runPublic() {
 	// check if public mosquitto already running
+	if app.Model == app.ModelG2H {
+		if err := exec.Command("sh", "-c", "netstat -ltn | grep -q '0.0.0.0:1883'").Run(); err == nil {
+			return
+		}
+	}
 	if err := exec.Command("sh", "-c", "netstat -ltnp | grep -q '0.0.0.0:1883'").Run(); err == nil {
 		return
 	}
@@ -75,7 +80,13 @@ func runPublic() {
 }
 
 func fixMosquitto() error {
-	data, err := os.ReadFile("/bin/mosquitto")
+	var path string
+	if app.Model == app.ModelG2H {
+		path = "/customer/mosquitto"
+	} else{
+		path = "/bin/mosquitto"
+	}
+	data, err := os.ReadFile(path)
 	if err != nil {
 		return err
 	}

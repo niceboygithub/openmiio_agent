@@ -17,7 +17,14 @@ const (
 	AddrGateway    = int(32)  // basic_app
 	AddrCentral    = int(128) // central_service_lite
 	AddrCloud      = int(0)   // miio_client
-	AddrMQQT       = int(-1)  // mosquitto
+	AddrMQTT       = int(-1)  // mosquitto
+	AddrAiotAuto   = int(256)
+	AddrRecorder   = int(1024)
+	AddrPPCS       = int(2048)
+	AddrAI         = int(4096)
+	AddrMatter     = int(65536)
+	AddrAiotEvent  = int(262144)
+	AddrAiotLan    = int(524288)
 )
 
 func appname(addr int) string {
@@ -38,8 +45,22 @@ func appname(addr int) string {
 		return "central"
 	case AddrCloud:
 		return "cloud"
-	case AddrMQQT:
+	case AddrMQTT:
 		return "mqtt"
+	case AddrAiotAuto:
+		return "aiot_automation"
+	case AddrRecorder:
+		return "recorder"
+	case AddrPPCS:
+		return "ppcs"
+	case AddrAI:
+		return "ai"
+	case AddrMatter:
+		return "matter"
+	case AddrAiotEvent:
+		return "aiot_event"
+	case AddrAiotLan:
+		return "aiot_lanbox"
 	}
 	return strconv.Itoa(addr)
 }
@@ -53,7 +74,7 @@ func Init() {
 
 	mqtt.Subscribe(func(topic string, payload []byte) {
 		if topic == "miio/command" {
-			miioRequestRaw(AddrMQQT, payload)
+			miioRequestRaw(AddrMQTT, payload)
 		}
 	}, "miio/command")
 
@@ -62,7 +83,9 @@ func Init() {
 
 	go rpc.MarksWorker()
 
-	go cloudWorker()
+	if app.Model != app.ModelM3 {
+		go cloudWorker()
+	}
 	go localWorker()
 }
 
@@ -70,7 +93,7 @@ func Send(to int, b []byte) {
 	switch to {
 	case AddrCloud:
 		sendToCloud(b)
-	case AddrMQQT:
+	case AddrMQTT:
 		mqtt.Publish("miio/command_ack", b, false)
 	default:
 		sendToUnicast(to, b)
@@ -101,7 +124,26 @@ func miioRequest(from int, msg rpc.Message) {
 			return // skip basic_gw bug
 		}
 
-		msg.SetInt("_from", from)
+		if app.IsAiot() {
+			//msg0, to0 := rpc.FindMessage(msg)
+			//log.Info().Msgf("1111 %s %d", msg0, to0)
+			if msg0, to0 := rpc.FindMessage(msg); msg0 != nil {
+				log.Trace().Msgf("[miio] %s res from=%d to=%d", msg, from, to0)
+
+				mqtt.Publish("miio/report_ack", msg, false)
+				miioResponse(to0, msg0, msg)
+				return
+			} else {
+				log.Trace().Msgf("[miio] %s req from=%d to=%d", msg, from, to)
+				if from > 0 {
+					mqtt.Publish("miio/report", msg, false)
+				}
+				msg.SetInt("_from", from)
+			}
+		} else {
+			msg.SetInt("_from", from)
+
+		}
 	} else if msg0, to0 := rpc.FindMessage(msg); msg0 != nil {
 		// 2. Response from any to any (msg with original ID)
 		log.Trace().Msgf("[miio] %s res from=%d to=%d", msg, from, to0)
@@ -138,9 +180,15 @@ func miioRequest(from int, msg rpc.Message) {
 		return
 	}
 
-	if to == AddrCloud {
-		// swap message ID, so we can catch response on this request
-		rpc.MarkMessage(msg, from)
+	if app.IsAiot() {
+		if to == AddrZigbee || to == AddrAiotAuto || to == AddrAiotLan {
+			rpc.MarkMessage(msg, from)
+		}
+	} else {
+		if to == AddrCloud {
+			// swap message ID, so we can catch response on this request
+			rpc.MarkMessage(msg, from)
+		}
 	}
 
 	b, err := msg.Marshal()

@@ -15,6 +15,9 @@ type SerialStats struct {
 		ZigbeeRX    uint32 `json:"zigbee_rx,omitempty"`
 		ZigbeeTX    uint32 `json:"zigbee_tx,omitempty"`
 		ZigbeeOE    uint32 `json:"zigbee_oe,omitempty"`
+		IrdaRX    uint32 `json:"irda_rx,omitempty"`
+		IrdaTX    uint32 `json:"irda_tx,omitempty"`
+		IrdaOE    uint32 `json:"irda_oe,omitempty"`
 	}
 }
 
@@ -46,6 +49,60 @@ func (s *SerialStats) MarshalJSON() ([]byte, error) {
 			s.stat.ZigbeeTX = counters[3]
 			s.stat.ZigbeeRX = counters[4]
 			s.stat.ZigbeeOE = counters[5]
+		}
+	case ModelM1S:
+		counters := readSerial("/proc/tty/driver/serial")
+		if len(counters) >= 6 {
+			s.stat.ZigbeeTX = counters[3]
+			s.stat.ZigbeeRX = counters[4]
+			s.stat.ZigbeeOE = counters[5]
+		}
+	case ModelM2:
+		counters := readSerial("/proc/tty/driver/ms_uart")
+		if len(counters) >= 9 {
+			s.stat.ZigbeeTX = counters[3]
+			s.stat.ZigbeeRX = counters[4]
+			s.stat.ZigbeeOE = counters[5]
+			s.stat.IrdaTX = counters[6]
+			s.stat.IrdaRX = counters[7]
+			s.stat.IrdaOE = counters[8]
+		}
+	case ModelM1S22, ModelG2HPro:
+		counters := readSerial("/proc/tty/driver/ms_uart")
+		if len(counters) >= 6 {
+			s.stat.ZigbeeTX = counters[3]
+			s.stat.ZigbeeRX = counters[4]
+			s.stat.ZigbeeOE = counters[5]
+		}
+	case ModelG2H:
+		counters := readSerial("/proc/tty/driver/ms_uart")
+		if len(counters) >= 9 {
+			s.stat.ZigbeeTX = counters[6]
+			s.stat.ZigbeeRX = counters[7]
+			s.stat.ZigbeeOE = counters[8]
+		}
+	case ModelG3:
+		counters := readSerial("/proc/tty/driver/ms_uart")
+		if len(counters) >= 9 {
+			s.stat.IrdaTX = counters[6]
+			s.stat.IrdaRX = counters[7]
+			s.stat.IrdaOE = counters[8]
+			s.stat.ZigbeeTX = counters[9]
+			s.stat.ZigbeeRX = counters[10]
+			s.stat.ZigbeeOE = counters[11]
+		}
+	case ModelM2PoE, ModelM3:
+		counters := readSerial("/proc/tty/driver/ms_uart")
+		if len(counters) >= 12 {
+			s.stat.ZigbeeTX = counters[3]
+			s.stat.ZigbeeRX = counters[4]
+			s.stat.ZigbeeOE = counters[5]
+			s.stat.BluetoothTX = counters[6]
+			s.stat.BluetoothRX = counters[7]
+			s.stat.BluetoothOE = counters[8]
+			s.stat.IrdaTX = counters[9]
+			s.stat.IrdaRX = counters[10]
+			s.stat.IrdaOE = counters[11]
 		}
 	}
 
